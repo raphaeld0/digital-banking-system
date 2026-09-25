@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0d1118">
+  <title>BankTest — Seu banco digital</title>
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-arrows" viewBox="0 0 24 24"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 9V6a2 2 0 0 1 2-2h12m4 8h-5a2 2 0 0 0 0 4h5"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5m4-4 4-4-4-4m-6 4h10"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 2 8 3v6c0 5-3.2 8.5-8 11-4.8-2.5-8-6-8-11V5l8-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 2-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-2.8v-.8a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3L9 19l-2-2 .1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H5v-2.8h.8a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L7 8l2-2 .1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V4h2.8v.8a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3L18 6l2 2-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.8v2.8h-.8a1.7 1.7 0 0 0-1.8 1.2Z"/></symbol>
+  </svg>
+
+  <main id="auth-screen" class="auth-screen">
+    <section class="auth-promo">
+      <div class="brand-lockup"><span class="brand-mark"><svg><use href="#i-shield"/></svg></span><span>BANK<span>TEST</span></span></div>
+      <div class="auth-promo-copy">
+        <span class="eyebrow">SEU DINHEIRO EM BOAS MÃOS</span>
+        <h1>O seu banco,<br><em>do seu jeito.</em></h1>
+        <p>Envie dinheiro pelo @usuário, acompanhe seu saldo e veja cada movimentação em um só lugar.</p>
+        <div class="auth-promo-stats"><span><strong>Simples</strong><small>Do cadastro à transferência</small></span><span><strong>Local</strong><small>Seus dados no seu computador</small></span></div>
+      </div>
+      <p class="demo-disclaimer">Projeto de demonstração · valores fictícios</p>
+    </section>
+
+    <section class="auth-form-side">
+      <div id="auth-card" class="auth-card">
+        <span class="eyebrow">BEM-VINDO AO BANKTEST</span>
+        <h2 id="form-title">Acesse sua conta</h2>
+        <p class="subtle" id="form-subtitle">Entre com seu @usuário para continuar.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Acesso à conta">
+          <button class="tab active" type="button" role="tab" data-mode="login" aria-selected="true">Entrar</button>
+          <button class="tab" type="button" role="tab" data-mode="register" aria-selected="false">Criar conta</button>
+        </div>
+        <form id="auth-form">
+          <label id="name-field" class="hidden">Nome completo<input name="name" autocomplete="name" placeholder="Seu nome"></label>
+          <label id="username-field">@usuário
+            <span class="handle-input"><span aria-hidden="true">@</span><input name="username" autocomplete="username" minlength="3" maxlength="24" placeholder="seunome" required></span>
+          </label>
+          <label id="email-field" class="hidden">E-mail<input name="email" type="email" autocomplete="email" placeholder="voce@email.com"></label>
+          <label>Senha<input name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required></label>
+          <button class="primary full" type="submit" id="submit-button">Entrar na conta <span aria-hidden="true">→</span></button>
+          <p class="form-message" id="message" role="status" aria-live="polite"></p>
+        </form>
+        <button class="text-button" id="legacy-toggle" type="button">Tenho uma conta antiga sem @usuário</button>
+        <button class="text-button hidden" id="continue-verification" type="button">Já tenho um código de verificação</button>
+      </div>
+      <div id="verify-card" class="auth-card hidden">
+        <span class="eyebrow">ÚLTIMA ETAPA</span>
+        <h2>Confirme seu e-mail</h2>
+        <p class="subtle">Enviamos um código de 6 dígitos para <strong id="verify-email"></strong>. Ele expira em 10 minutos.</p>
+        <form id="verify-form">
+          <label>Código de verificação<input id="verify-code" name="code" class="verify-code-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="000000" required></label>
+          <button class="primary full" type="submit">Confirmar e criar conta <span aria-hidden="true">→</span></button>
+          <p class="form-message" id="verify-message" role="status" aria-live="polite"></p>
+        </form>
+        <div class="verify-actions"><button class="text-button" id="resend-code" type="button">Reenviar código</button><button class="text-button" id="back-to-register" type="button">Voltar ao cadastro</button></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-shell" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand-lockup"><span class="brand-mark"><svg><use href="#i-shield"/></svg></span><span>BANK<span>TEST</span></span></div>
+      <nav class="side-nav" aria-label="Navegação principal">
+        <button type="button" class="nav-link active" data-view="home"><svg><use href="#i-grid"/></svg> Início</button>
+        <button type="button" class="nav-link" data-view="transactions"><svg><use href="#i-arrows"/></svg> Transações</button>
+        <button type="button" class="nav-link" data-view="settings"><svg><use href="#i-settings"/></svg> Configurações</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-account"><span id="sidebar-avatar" class="avatar">N</span><span><strong id="sidebar-name">Conta</strong><small id="sidebar-handle">@usuario</small></span></div>
+        <button type="button" id="logout" class="icon-button" title="Sair da conta" aria-label="Sair da conta"><svg><use href="#i-logout"/></svg></button>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div><h1 id="welcome">Olá!</h1><p id="topbar-subtitle">Bem-vindo de volta! Aqui está o resumo das suas finanças.</p></div>
+        <label id="search-box" class="search-box"><svg><use href="#i-search"/></svg><input id="search-input" type="search" placeholder="Buscar transação, @usuário..." aria-label="Buscar no extrato"></label>
+      </header>
+
+      <section id="legacy-username-card" class="legacy-card hidden">
+        <div><h2>Escolha seu @usuário</h2><p>Sua conta já existia antes deste recurso. Defina um identificador para receber transferências.</p></div>
+        <form id="username-form"><label class="handle-input"><span aria-hidden="true">@</span><input name="username" placeholder="seunome" minlength="3" maxlength="24" required aria-label="Novo usuário"></label><button type="submit" class="primary">Salvar @usuário</button></form>
+      </section>
+
+      <div id="home-view" class="dashboard-grid">
+        <section class="panel balance-card">
+          <div class="balance-label"><span><svg><use href="#i-wallet"/></svg> Saldo disponível</span><button id="toggle-balance" type="button" class="icon-button" aria-label="Ocultar saldo" title="Mostrar ou ocultar saldo"><svg><use href="#i-eye"/></svg></button></div>
+          <strong id="balance" class="balance-value">R$ 0,00</strong>
+          <p class="balance-note">Conta digital de demonstração · valores fictícios</p>
+          <div class="quick-actions">
+            <button id="quick-transfer" type="button"><span class="quick-icon cyan"><svg><use href="#i-send"/></svg></span>Transferir</button>
+            <button id="quick-statement" type="button"><span class="quick-icon teal"><svg><use href="#i-list"/></svg></span>Extrato</button>
+            <button id="demo-credit" type="button"><span class="quick-icon violet"><svg><use href="#i-plus"/></svg></span>Saldo de teste</button>
+            <button id="copy-handle" type="button"><span class="quick-icon slate"><svg><use href="#i-copy"/></svg></span>Copiar @</button>
+          </div>
+        </section>
+
+        <section class="panel contacts-card">
+          <div class="panel-heading"><div><h2>Amizades favoritas</h2><p>Salvas só na sua conta, sem convite</p></div></div>
+          <form id="favorite-form" class="favorite-form">
+            <label class="handle-input"><span aria-hidden="true">@</span><input name="username" placeholder="usuario" autocomplete="off" required aria-label="@usuário para favoritar"></label>
+            <button type="submit" class="secondary">Adicionar</button>
+          </form>
+          <p id="favorite-message" class="form-message" role="status" aria-live="polite"></p>
+          <div id="contacts-list" class="contacts-list"></div>
+          <p id="contacts-empty" class="empty-state">Nenhuma amizade favorita. Adicione alguém pelo @usuário.</p>
+        </section>
+
+        <section class="panel chart-card">
+          <div class="panel-heading"><div><h2>Movimentação financeira</h2><p>Últimos 6 meses · até 50 movimentos</p></div><div class="chart-legend"><span class="dot green"></span> Entradas <span class="dot blue"></span> Saídas</div></div>
+          <div class="chart-wrap"><svg id="activity-chart" viewBox="0 0 600 190" role="img" aria-label="Gráfico de entradas e saídas dos últimos seis meses"></svg></div>
+          <div id="chart-labels" class="chart-labels"></div>
+        </section>
+
+        <section class="panel recent-card">
+          <div class="panel-heading"><h2>Transações recentes</h2><button type="button" class="text-button" id="see-all">Ver tudo</button></div>
+          <div id="recent-list" class="movement-list"></div>
+          <p id="recent-empty" class="empty-state">Nenhuma movimentação ainda.</p>
+        </section>
+      </div>
+
+      <section id="transactions-view" class="panel transactions-view hidden">
+        <div class="panel-heading"><div><h2>Seu extrato</h2><p>Últimas 50 movimentações</p></div><button type="button" class="secondary" id="new-transfer">Nova transferência</button></div>
+        <div id="statement-list" class="movement-list full-list"></div>
+        <p id="statement-empty" class="empty-state">Nenhuma movimentação encontrada.</p>
+      </section>
+      <section id="settings-view" class="settings-view hidden">
+        <section class="panel settings-card">
+          <div class="panel-heading"><div><h2>Aparência</h2><p>Escolha como o BankTest aparece neste navegador.</p></div></div>
+          <div class="theme-options" role="group" aria-label="Tema do site">
+            <button type="button" class="theme-option" data-theme="light" aria-pressed="false"><span class="theme-preview light-preview"><span></span><span></span></span><strong>Claro</strong><small>Fundo claro e contraste suave</small></button>
+            <button type="button" class="theme-option" data-theme="dark" aria-pressed="true"><span class="theme-preview dark-preview"><span></span><span></span></span><strong>Escuro</strong><small>Fundo escuro e menor brilho</small></button>
+          </div>
+        </section>
+
+        <section class="panel settings-card">
+          <div class="panel-heading"><div><h2>E-mail da conta</h2><p>Seu acesso continua sendo feito pelo @usuário.</p></div></div>
+          <form id="settings-email-form" class="settings-form">
+            <label>Novo e-mail<input name="email" type="email" autocomplete="email" required></label>
+            <label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required></label>
+            <button class="primary" type="submit">Salvar e-mail</button>
+            <p id="settings-email-message" class="form-message" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section class="panel settings-card">
+          <div class="panel-heading"><div><h2>Alterar senha</h2><p>Use de 8 a 128 caracteres, com pelo menos uma letra e um número.</p></div></div>
+          <form id="settings-password-form" class="settings-form">
+            <label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required></label>
+            <label>Nova senha<input name="newPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+            <label>Confirme a nova senha<input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+            <button class="primary" type="submit">Alterar senha</button>
+            <p id="settings-password-message" class="form-message" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+      </section>
+      <p id="toast" class="toast hidden" role="status" aria-live="polite"></p>
+    </main>
+  </div>
+
+  <div id="transfer-dialog" class="dialog-backdrop hidden" role="presentation">
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-title">
+      <div class="dialog-head"><div><span class="eyebrow">TRANSFERÊNCIA</span><h2 id="transfer-title">Enviar dinheiro</h2></div><button id="close-transfer" type="button" class="icon-button close-button" aria-label="Fechar">×</button></div>
+      <p class="subtle">Basta informar o @usuário de quem vai receber.</p>
+      <form id="transfer-form">
+        <label>Destinatário<span class="handle-input"><span aria-hidden="true">@</span><input name="recipientUsername" placeholder="raphaeldias" required autocomplete="off"></span></label>
+        <label>Valor em reais<input name="amount" inputmode="numeric" value="0,00" autocomplete="off" required><small class="currency-hint">Digite os números: 1 → 0,01 · 100 → 1,00</small></label>
+        <button type="submit" class="primary full">Enviar transferência <span aria-hidden="true">→</span></button>
+        <p id="transfer-message" class="form-message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

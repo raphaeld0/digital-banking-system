@@ -1,0 +1,22 @@
+{
+  "name": "banktest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mini banco com autenticação, Node.js, TypeScript e SQLite local",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build && node --watch dist/server.js",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "seed:admin": "npm run build && node dist/seed-admin.js",
+    "test": "npm run build && node --test dist/**/*.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
