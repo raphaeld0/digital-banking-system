@@ -2,6 +2,8 @@
 
 Mini banco local com cadastro, login por @usuário, transferências, extrato e amizades favoritas. O painel mostra saldo, movimentações, um gráfico dos últimos seis meses baseado nas 50 movimentações mais recentes e contatos salvos por você.
 
+![alt text](image.png)
+
 ## Tecnologias
 
 - Node.js 24+
