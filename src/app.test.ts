@@ -300,8 +300,16 @@ test("agendamentos únicos e recorrentes processam saldo e podem ser cancelados"
 
   const weekly = await schedule("weekly");
   assert.equal(weekly.response.status, 201);
+  database.prepare("UPDATE scheduled_transfers SET next_run_at = datetime('now', '-1 second') WHERE id = ?")
+    .run(weekly.body.transfer.id);
+  processDueScheduledTransfers(database);
   const active = await request("/api/scheduled-transfers", {}, token);
-  assert.equal(active.body.transfers.find((transfer: any) => transfer.id === weekly.body.transfer.id).frequency, "weekly");
+  const recurring = active.body.transfers.find((transfer: any) => transfer.id === weekly.body.transfer.id);
+  assert.equal(recurring.frequency, "weekly");
+  assert.equal(recurring.status, "active");
+  assert.ok(new Date(`${recurring.nextRunAt.replace(" ", "T")}Z`).getTime() > Date.now());
+  const afterWeekly = await request("/api/auth/me", {}, token);
+  assert.equal(afterWeekly.body.user.balanceCents, 97000);
   const cancelled = await request(`/api/scheduled-transfers/${weekly.body.transfer.id}`, { method: "DELETE" }, token);
   assert.equal(cancelled.response.status, 204);
   const noLongerActive = await request("/api/scheduled-transfers", {}, token);
