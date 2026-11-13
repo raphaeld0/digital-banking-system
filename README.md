@@ -36,6 +36,8 @@ Na aba **Configurações**, é possível alterar o e-mail e a senha informando a
 
 Em **Amizades favoritas**, adicione qualquer conta existente pelo @usuário, remova-a quando quiser e inicie uma transferência pela lista. O favorito pertence apenas à sua conta: a outra pessoa não precisa aceitar e não recebe uma amizade recíproca automaticamente.
 
+Em **Transações**, pesquise por contato, usuário, valor, data ou identificador e filtre por tipo e período. O extrato mostra as 50 movimentações mais recentes; transferências concluídas têm comprovante que pode ser impresso.
+
 ## Endpoints
 
 - `POST /api/auth/register` — `{ "name", "username", "email", "password" }`; inicia o cadastro e envia o código

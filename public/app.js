@@ -239,6 +239,12 @@ $("#transfer-form").addEventListener("submit", async (event) => {
     await loadStatement();
     closeTransfer();
     event.currentTarget.reset();
+    showReceipt({
+      id: result.transfer.id,
+      createdAt: result.transfer.createdAt,
+      amountCents: -amountCents,
+      counterpartyUsername: result.transfer.to.replace(/^@/, ""),
+    });
     notify(`${money(amountCents)} enviados para ${result.transfer.to}.`);
   } catch (error) {
     message.textContent = error.message;
@@ -251,7 +257,16 @@ $("#quick-transfer").addEventListener("click", () => openTransfer());
 $("#new-transfer").addEventListener("click", () => openTransfer());
 $("#close-transfer").addEventListener("click", closeTransfer);
 $("#transfer-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) closeTransfer(); });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeTransfer(); });
+$("#close-receipt").addEventListener("click", closeReceipt);
+$("#done-receipt").addEventListener("click", closeReceipt);
+$("#print-receipt").addEventListener("click", () => window.print());
+$("#receipt-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) closeReceipt(); });
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeTransfer();
+    closeReceipt();
+  }
+});
 $("#quick-statement").addEventListener("click", () => showView("transactions"));
 $("#see-all").addEventListener("click", () => showView("transactions"));
 document.querySelectorAll(".nav-link").forEach((link) => link.addEventListener("click", () => showView(link.dataset.view)));
@@ -311,6 +326,16 @@ $("#search-input").addEventListener("input", (event) => {
   if (event.target.value.trim()) showView("transactions");
   renderMovements();
 });
+["statement-type", "statement-from", "statement-to"].forEach((selector) => {
+  $(`#${selector}`).addEventListener("change", renderMovements);
+});
+$("#clear-statement-filters").addEventListener("click", () => {
+  $("#search-input").value = "";
+  $("#statement-type").value = "all";
+  $("#statement-from").value = "";
+  $("#statement-to").value = "";
+  renderMovements();
+});
 $("#toggle-balance").addEventListener("click", () => {
   state.balanceVisible = !state.balanceVisible;
   renderBalance();
@@ -351,6 +376,30 @@ function openTransfer(username = "") {
 }
 
 function closeTransfer() { $("#transfer-dialog").classList.add("hidden"); }
+function closeReceipt() { $("#receipt-dialog").classList.add("hidden"); }
+
+function showReceipt(transfer) {
+  const date = new Date(`${transfer.createdAt.replace(" ", "T")}Z`);
+  const rows = [
+    ["Comprovante", `TR-${transfer.id}`],
+    ["Data e hora", date.toLocaleString("pt-BR")],
+    ["De", `@${state.user.username}`],
+    ["Para", `@${transfer.counterpartyUsername}`],
+    ["Valor", money(Math.abs(transfer.amountCents))],
+    ["Status", "Concluída"],
+  ];
+  const details = $("#receipt-details");
+  details.replaceChildren(...rows.map(([label, value]) => {
+    const row = document.createElement("div");
+    const heading = document.createElement("span");
+    heading.textContent = label;
+    const content = document.createElement("strong");
+    content.textContent = value;
+    row.append(heading, content);
+    return row;
+  }));
+  $("#receipt-dialog").classList.remove("hidden");
+}
 
 function showView(view) {
   state.view = view;
@@ -418,14 +467,25 @@ async function loadFavorites() {
 
 function renderMovements() {
   const query = $("#search-input").value.trim().toLowerCase();
-  const filtered = state.entries.filter((entry) =>
+  const matchingSearch = state.entries.filter((entry) =>
     !query || (entry.counterpartyUsername || "").toLowerCase().includes(query.replace(/^@/, "")) ||
     (entry.counterpartyName || "").toLowerCase().includes(query) ||
+    String(entry.id).includes(query) ||
+    money(Math.abs(entry.amountCents)).toLowerCase().includes(query) ||
+    entry.createdAt.toLowerCase().includes(query) ||
     (entry.type === "demo_credit" && "saldo de teste".includes(query))
   );
-  fillMovements($("#recent-list"), filtered.slice(0, 4));
+  const type = $("#statement-type").value;
+  const from = $("#statement-from").value;
+  const to = $("#statement-to").value;
+  const filtered = matchingSearch.filter((entry) =>
+    (type === "all" || entry.type === type) &&
+    (!from || entry.createdAt.slice(0, 10) >= from) &&
+    (!to || entry.createdAt.slice(0, 10) <= to)
+  );
+  fillMovements($("#recent-list"), matchingSearch.slice(0, 4));
   fillMovements($("#statement-list"), filtered);
-  $("#recent-empty").classList.toggle("hidden", filtered.length > 0);
+  $("#recent-empty").classList.toggle("hidden", matchingSearch.length > 0);
   $("#statement-empty").classList.toggle("hidden", filtered.length > 0);
 }
 
@@ -450,6 +510,14 @@ function fillMovements(container, entries) {
     amount.className = `movement-amount${entry.amountCents > 0 ? " in" : ""}`;
     amount.textContent = `${entry.amountCents > 0 ? "+" : "−"} ${money(Math.abs(entry.amountCents))}`;
     row.append(icon, detail, amount);
+    if (entry.type === "transfer") {
+      const receipt = document.createElement("button");
+      receipt.type = "button";
+      receipt.className = "movement-receipt";
+      receipt.textContent = "Comprovante";
+      receipt.addEventListener("click", () => showReceipt(entry));
+      row.append(receipt);
+    }
     container.append(row);
   }
 }

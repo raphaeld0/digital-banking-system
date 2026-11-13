@@ -136,6 +136,18 @@
 
       <section id="transactions-view" class="panel transactions-view hidden">
         <div class="panel-heading"><div><h2>Seu extrato</h2><p>Últimas 50 movimentações</p></div><button type="button" class="secondary" id="new-transfer">Nova transferência</button></div>
+        <div class="statement-filters" aria-label="Filtros do extrato">
+          <label>Tipo
+            <select id="statement-type">
+              <option value="all">Todos</option>
+              <option value="transfer">Transferências</option>
+              <option value="demo_credit">Saldo de teste</option>
+            </select>
+          </label>
+          <label>De<input id="statement-from" type="date"></label>
+          <label>Até<input id="statement-to" type="date"></label>
+          <button type="button" class="text-button" id="clear-statement-filters">Limpar filtros</button>
+        </div>
         <div id="statement-list" class="movement-list full-list"></div>
         <p id="statement-empty" class="empty-state">Nenhuma movimentação encontrada.</p>
       </section>
@@ -183,6 +195,13 @@
         <button type="submit" class="primary full">Enviar transferência <span aria-hidden="true">→</span></button>
         <p id="transfer-message" class="form-message" role="status" aria-live="polite"></p>
       </form>
+    </section>
+  </div>
+  <div id="receipt-dialog" class="dialog-backdrop hidden" role="presentation">
+    <section class="dialog receipt-dialog" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
+      <div class="dialog-head"><div><span class="eyebrow">COMPROVANTE</span><h2 id="receipt-title">Transferência concluída</h2></div><button id="close-receipt" type="button" class="icon-button close-button" aria-label="Fechar comprovante">×</button></div>
+      <div id="receipt-details" class="receipt-details"></div>
+      <div class="receipt-actions"><button type="button" class="secondary" id="print-receipt">Imprimir comprovante</button><button type="button" class="primary" id="done-receipt">Concluir</button></div>
     </section>
   </div>
   <script src="/app.js" defer></script>

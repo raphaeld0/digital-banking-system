@@ -151,6 +151,7 @@ test("transferência atualiza ambos os saldos e aparece nos dois extratos", asyn
   assert.equal(transfer.response.status, 201);
   assert.equal(transfer.body.user.balanceCents, 97500);
   assert.equal(transfer.body.transfer.to, "@bialima");
+  assert.match(transfer.body.transfer.createdAt, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
 
   const recipientMe = await request("/api/auth/me", {}, recipient.body.token);
   assert.equal(recipientMe.body.user.balanceCents, 2500);
@@ -424,6 +425,8 @@ test("interface e arquivos do painel são servidos", async () => {
   assert.match(html, /id="verify-card"/);
   assert.match(html, /BankTest/);
   assert.match(html, /id="favorite-form"/);
+  assert.match(html, /id="statement-type"/);
+  assert.match(html, /id="receipt-dialog"/);
 
   const script = await fetch(`${origin}/app.js`);
   assert.equal(script.status, 200);

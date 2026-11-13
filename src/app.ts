@@ -345,9 +345,11 @@ export function createApp(options: AppOptions) {
           database.prepare("UPDATE users SET balance_cents = balance_cents + ? WHERE id = ?").run(input.amountCents, recipient.id);
           const result = database.prepare("INSERT INTO transfers (sender_id, recipient_id, amount_cents) VALUES (?, ?, ?)")
             .run(user.id, recipient.id, input.amountCents);
+          const createdAt = database.prepare("SELECT created_at AS createdAt FROM transfers WHERE id = ?")
+            .get(Number(result.lastInsertRowid)) as { createdAt: string };
           database.exec("COMMIT");
           return json(response, 201, {
-            transfer: { id: Number(result.lastInsertRowid), to: `@${recipient.username}`, amountCents: input.amountCents },
+            transfer: { id: Number(result.lastInsertRowid), to: `@${recipient.username}`, amountCents: input.amountCents, createdAt: createdAt.createdAt },
             user: publicUser(findUserById(database, user.id)),
           });
         } catch (error) {
