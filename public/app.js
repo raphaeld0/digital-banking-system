@@ -438,6 +438,33 @@ $("#clear-statement-filters").addEventListener("click", () => {
   $("#statement-to").value = "";
   renderMovements();
 });
+$("#export-statement").addEventListener("click", () => {
+  const entries = filteredStatementEntries();
+  if (entries.length === 0) return notify("Não há movimentações para exportar com esses filtros.", true);
+  const rows = [
+    ["ID", "Data UTC", "Tipo", "Descrição", "@Usuário", "Valor (centavos)", "Valor (R$)"],
+    ...entries.map((entry) => [
+      entry.id,
+      entry.createdAt,
+      entry.type,
+      entry.type === "demo_credit" ? "Saldo de teste" :
+        entry.type === "savings_contribution" ? `Aporte para ${entry.counterpartyName}` :
+          entry.type === "savings_withdrawal" ? `Resgate da meta ${entry.counterpartyName}` :
+            `${entry.amountCents < 0 ? "Transferência para" : "Transferência de"} @${entry.counterpartyUsername}`,
+      entry.counterpartyUsername ? `@${entry.counterpartyUsername}` : "",
+      entry.amountCents,
+      (entry.amountCents / 100).toFixed(2).replace(".", ","),
+    ]),
+  ];
+  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = `extrato-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+});
 $("#toggle-balance").addEventListener("click", () => {
   state.balanceVisible = !state.balanceVisible;
   renderBalance();
@@ -712,26 +739,43 @@ function renderFinance() {
 
 function renderMovements() {
   const query = $("#search-input").value.trim().toLowerCase();
-  const matchingSearch = state.entries.filter((entry) =>
-    !query || (entry.counterpartyUsername || "").toLowerCase().includes(query.replace(/^@/, "")) ||
-    (entry.counterpartyName || "").toLowerCase().includes(query) ||
-    String(entry.id).includes(query) ||
-    money(Math.abs(entry.amountCents)).toLowerCase().includes(query) ||
-    entry.createdAt.toLowerCase().includes(query) ||
-    (entry.type === "demo_credit" && "saldo de teste".includes(query))
-  );
-  const type = $("#statement-type").value;
-  const from = $("#statement-from").value;
-  const to = $("#statement-to").value;
-  const filtered = matchingSearch.filter((entry) =>
-    (type === "all" || entry.type === type) &&
-    (!from || entry.createdAt.slice(0, 10) >= from) &&
-    (!to || entry.createdAt.slice(0, 10) <= to)
-  );
+  const matchingSearch = state.entries.filter((entry) => matchesStatementSearch(entry, query));
+  const filtered = filteredStatementEntries();
   fillMovements($("#recent-list"), matchingSearch.slice(0, 4));
   fillMovements($("#statement-list"), filtered);
   $("#recent-empty").classList.toggle("hidden", matchingSearch.length > 0);
   $("#statement-empty").classList.toggle("hidden", filtered.length > 0);
+  $("#export-statement").disabled = filtered.length === 0;
+}
+
+function matchesStatementSearch(entry, query) {
+  return !query || (entry.counterpartyUsername || "").toLowerCase().includes(query.replace(/^@/, "")) ||
+    (entry.counterpartyName || "").toLowerCase().includes(query) ||
+    String(entry.id).includes(query) ||
+    money(Math.abs(entry.amountCents)).toLowerCase().includes(query) ||
+    entry.createdAt.toLowerCase().includes(query) ||
+    (entry.type === "demo_credit" && "saldo de teste".includes(query)) ||
+    (entry.type === "savings_contribution" && `aporte para ${entry.counterpartyName}`.toLowerCase().includes(query)) ||
+    (entry.type === "savings_withdrawal" && `resgate da meta ${entry.counterpartyName}`.toLowerCase().includes(query));
+}
+
+function filteredStatementEntries() {
+  const query = $("#search-input").value.trim().toLowerCase();
+  const type = $("#statement-type").value;
+  const from = $("#statement-from").value;
+  const to = $("#statement-to").value;
+  return state.entries.filter((entry) =>
+    matchesStatementSearch(entry, query) &&
+    (type === "all" || entry.type === type) &&
+    (!from || entry.createdAt.slice(0, 10) >= from) &&
+    (!to || entry.createdAt.slice(0, 10) <= to)
+  );
+}
+
+function csvCell(value) {
+  let text = String(value ?? "");
+  if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 function fillMovements(container, entries) {

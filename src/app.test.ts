@@ -521,6 +521,7 @@ test("interface e arquivos do painel são servidos", async () => {
   assert.match(html, /id="favorite-form"/);
   assert.match(html, /id="statement-type"/);
   assert.match(html, /id="receipt-dialog"/);
+  assert.match(html, /id="export-statement"/);
   assert.match(html, /id="finance-view"/);
   assert.match(html, /id="goal-form"/);
   assert.match(html, /id="schedule-form"/);

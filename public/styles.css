@@ -343,3 +343,9 @@ form input:focus,.search-box:focus-within,.handle-input:focus-within{border-colo
   .schedule-form{grid-template-columns:1fr}
   .scheduled-item{align-items:flex-start;flex-direction:column}
 }
+.statement-actions{display:flex;flex-wrap:wrap;gap:8px}
+.statement-actions .secondary{white-space:nowrap}
+@media(max-width:540px){
+  .transactions-view>.panel-heading{align-items:flex-start;flex-direction:column}
+  .statement-actions{width:100%}
+}

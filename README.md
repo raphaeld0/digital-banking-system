@@ -36,7 +36,7 @@ Na aba **Configurações**, é possível alterar o e-mail e a senha informando a
 
 Em **Amizades favoritas**, adicione qualquer conta existente pelo @usuário, remova-a quando quiser e inicie uma transferência pela lista. O favorito pertence apenas à sua conta: a outra pessoa não precisa aceitar e não recebe uma amizade recíproca automaticamente.
 
-Em **Transações**, pesquise por contato, usuário, valor, data ou identificador e filtre por tipo e período. O extrato mostra as 50 movimentações mais recentes; transferências concluídas têm comprovante que pode ser impresso.
+Em **Transações**, pesquise por contato, usuário, valor, data ou identificador e filtre por tipo e período. O extrato mostra as 50 movimentações mais recentes; transferências concluídas têm comprovante que pode ser impresso. Use **Exportar CSV** para baixar as movimentações que correspondem aos filtros atuais, em formato compatível com planilhas.
 
 Em **Planejamento**, configure um limite mensal para transferências e crie metas de economia. Aportes são descontados do saldo disponível e aparecem no extrato; ao excluir uma meta, o valor guardado volta para o saldo. O orçamento acompanha transferências de saída e bloqueia uma nova transferência que ultrapassaria o limite.
 
