@@ -83,5 +83,32 @@ function migrate(database: BankDatabase): void {
       CHECK (owner_id <> contact_id)
     );
     CREATE INDEX IF NOT EXISTS idx_favorite_contacts_owner ON favorite_contacts(owner_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS monthly_budgets (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      limit_cents INTEGER NOT NULL CHECK (limit_cents > 0),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS savings_goals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      target_cents INTEGER NOT NULL CHECK (target_cents > 0),
+      saved_cents INTEGER NOT NULL DEFAULT 0 CHECK (saved_cents >= 0),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, name COLLATE NOCASE)
+    );
+    CREATE INDEX IF NOT EXISTS idx_savings_goals_user ON savings_goals(user_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS savings_goal_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      goal_id INTEGER REFERENCES savings_goals(id) ON DELETE SET NULL,
+      goal_name TEXT NOT NULL,
+      amount_cents INTEGER NOT NULL CHECK (amount_cents <> 0),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_savings_goal_entries_user ON savings_goal_entries(user_id, id DESC);
   `);
 }

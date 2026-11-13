@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const money = (cents) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
-const state = { user: null, entries: [], favorites: [], view: "home", balanceVisible: true, authMode: "login", pendingEmail: null };
+const state = { user: null, entries: [], favorites: [], finance: { monthlyBudgetCents: null, monthlySpentCents: 0, goals: [] }, view: "home", balanceVisible: true, authMode: "login", pendingEmail: null };
 let toastTimer;
 let resendTimer;
 
@@ -161,6 +161,7 @@ async function finishAuthentication(result) {
   try { sessionStorage.removeItem("bank_pending_email"); } catch {}
   state.entries = [];
   state.favorites = [];
+  state.finance = { monthlyBudgetCents: null, monthlySpentCents: 0, goals: [] };
   renderContacts();
   state.view = "home";
   $("#search-input").value = "";
@@ -168,6 +169,7 @@ async function finishAuthentication(result) {
   setUser(result.user);
   try { await loadStatement(); } catch { notify("Não foi possível carregar o extrato agora.", true); }
   try { await loadFavorites(); } catch { notify("Não foi possível carregar as amizades agora.", true); }
+  try { await loadFinance(); } catch { notify("Não foi possível carregar seu planejamento agora.", true); }
 }
 
 $("#favorite-form").addEventListener("submit", async (event) => {
@@ -237,6 +239,7 @@ $("#transfer-form").addEventListener("submit", async (event) => {
     });
     setUser(result.user);
     await loadStatement();
+    await loadFinance();
     closeTransfer();
     event.currentTarget.reset();
     showReceipt({
@@ -315,6 +318,72 @@ $("#settings-password-form").addEventListener("submit", async (event) => {
     });
     form.reset();
     message.textContent = result.message;
+    message.classList.add("success");
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#budget-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const message = $("#budget-message");
+  message.textContent = "";
+  button.disabled = true;
+  try {
+    const fields = Object.fromEntries(new FormData(form));
+    const result = await api("/api/monthly-budget", {
+      method: "PUT",
+      body: JSON.stringify({ limitCents: parseAmountInput(fields.limit) }),
+    });
+    state.finance = result;
+    renderFinance();
+    message.textContent = "Orçamento mensal atualizado.";
+    message.classList.add("success");
+  } catch (error) {
+    message.classList.remove("success");
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#remove-budget").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    state.finance = await api("/api/monthly-budget", { method: "DELETE" });
+    $("#budget-form").reset();
+    $("#budget-message").textContent = "";
+    renderFinance();
+    notify("Limite mensal removido.");
+  } catch (error) {
+    notify(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#goal-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const message = $("#goal-message");
+  message.textContent = "";
+  message.classList.remove("success");
+  button.disabled = true;
+  try {
+    const fields = Object.fromEntries(new FormData(form));
+    await api("/api/savings-goals", {
+      method: "POST",
+      body: JSON.stringify({ name: fields.name, targetCents: parseAmountInput(fields.target) }),
+    });
+    form.reset();
+    await loadFinance();
+    message.textContent = "Meta criada.";
     message.classList.add("success");
   } catch (error) {
     message.textContent = error.message;
@@ -405,10 +474,11 @@ function showView(view) {
   state.view = view;
   $("#home-view").classList.toggle("hidden", view !== "home");
   $("#transactions-view").classList.toggle("hidden", view !== "transactions");
+  $("#finance-view").classList.toggle("hidden", view !== "finance");
   $("#settings-view").classList.toggle("hidden", view !== "settings");
   $("#search-box").classList.toggle("hidden", view === "settings");
-  $("#welcome").textContent = view === "settings" ? "Configurações" : view === "transactions" ? "Transações" : `Olá, ${state.user.name.split(" ")[0]}`;
-  $("#topbar-subtitle").textContent = view === "settings" ? "Gerencie seus dados de acesso e a aparência do site." : view === "transactions" ? "Confira as movimentações da sua conta." : "Bem-vindo de volta! Aqui está o resumo das suas finanças.";
+  $("#welcome").textContent = view === "settings" ? "Configurações" : view === "transactions" ? "Transações" : view === "finance" ? "Planejamento" : `Olá, ${state.user.name.split(" ")[0]}`;
+  $("#topbar-subtitle").textContent = view === "settings" ? "Gerencie seus dados de acesso e a aparência do site." : view === "transactions" ? "Confira as movimentações da sua conta." : view === "finance" ? "Organize seus limites e acompanhe suas metas." : "Bem-vindo de volta! Aqui está o resumo das suas finanças.";
   document.querySelectorAll(".nav-link").forEach((link) => link.classList.toggle("active", link.dataset.view === view));
 }
 
@@ -465,6 +535,97 @@ async function loadFavorites() {
   renderContacts();
 }
 
+async function loadFinance() {
+  state.finance = await api("/api/finance/overview");
+  renderFinance();
+}
+
+function renderFinance() {
+  const { monthlyBudgetCents, monthlySpentCents, goals } = state.finance;
+  if (monthlyBudgetCents !== null) $("#budget-form [name=limit]").value = (monthlyBudgetCents / 100).toFixed(2);
+  $("#budget-summary").textContent = monthlyBudgetCents === null
+    ? `Sem limite definido · ${money(monthlySpentCents)} em transferências neste mês`
+    : `${money(monthlySpentCents)} de ${money(monthlyBudgetCents)} usados neste mês`;
+  const progress = $("#budget-progress");
+  progress.classList.toggle("hidden", monthlyBudgetCents === null);
+  progress.value = monthlyBudgetCents ? Math.min(100, monthlySpentCents / monthlyBudgetCents * 100) : 0;
+  progress.classList.toggle("over-budget", monthlyBudgetCents !== null && monthlySpentCents > monthlyBudgetCents);
+  $("#remove-budget").disabled = monthlyBudgetCents === null;
+
+  const container = $("#goals-list");
+  container.replaceChildren();
+  $("#goals-empty").classList.toggle("hidden", goals.length > 0);
+  for (const goal of goals) {
+    const card = document.createElement("article");
+    card.className = "goal-card";
+    const header = document.createElement("div");
+    header.className = "goal-heading";
+    const name = document.createElement("strong");
+    name.textContent = goal.name;
+    const amounts = document.createElement("span");
+    amounts.textContent = `${money(goal.savedCents)} de ${money(goal.targetCents)}`;
+    header.append(name, amounts);
+    const progressBar = document.createElement("progress");
+    progressBar.max = goal.targetCents;
+    progressBar.value = goal.savedCents;
+    progressBar.setAttribute("aria-label", `Progresso da meta ${goal.name}`);
+    const actions = document.createElement("div");
+    actions.className = "goal-actions";
+    const contributionForm = document.createElement("form");
+    contributionForm.className = "goal-contribution-form";
+    const amountInput = document.createElement("input");
+    amountInput.name = "amount";
+    amountInput.type = "number";
+    amountInput.min = "0.01";
+    amountInput.max = String((goal.targetCents - goal.savedCents) / 100);
+    amountInput.step = "0.01";
+    amountInput.placeholder = "Valor (R$)";
+    amountInput.required = true;
+    amountInput.setAttribute("aria-label", `Valor para guardar na meta ${goal.name}`);
+    const contribute = document.createElement("button");
+    contribute.type = "submit";
+    contribute.className = "secondary";
+    contribute.textContent = "Guardar";
+    contributionForm.append(amountInput, contribute);
+    contributionForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      contribute.disabled = true;
+      try {
+        await api(`/api/savings-goals/${goal.id}/contributions`, {
+          method: "POST",
+          body: JSON.stringify({ amountCents: parseAmountInput(amountInput.value) }),
+        });
+        await Promise.all([loadFinance(), loadStatement()]);
+        setUser(await getCurrentUser());
+        notify(`${money(parseAmountInput(amountInput.value))} guardados na meta.`);
+      } catch (error) {
+        notify(error.message, true);
+        contribute.disabled = false;
+      }
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "text-button";
+    remove.textContent = "Excluir";
+    remove.addEventListener("click", async () => {
+      if (!window.confirm(`Excluir a meta "${goal.name}"? O valor guardado voltará ao saldo disponível.`)) return;
+      remove.disabled = true;
+      try {
+        await api(`/api/savings-goals/${goal.id}`, { method: "DELETE" });
+        await Promise.all([loadFinance(), loadStatement()]);
+        setUser(await getCurrentUser());
+        notify("Meta excluída e valor devolvido ao saldo.");
+      } catch (error) {
+        notify(error.message, true);
+        remove.disabled = false;
+      }
+    });
+    actions.append(contributionForm, remove);
+    card.append(header, progressBar, actions);
+    container.append(card);
+  }
+}
+
 function renderMovements() {
   const query = $("#search-input").value.trim().toLowerCase();
   const matchingSearch = state.entries.filter((entry) =>
@@ -501,7 +662,9 @@ function fillMovements(container, entries) {
     detail.className = "movement-info";
     const title = document.createElement("strong");
     title.textContent = entry.type === "demo_credit" ? "Saldo de teste" :
-      `${entry.amountCents < 0 ? "Para" : "De"} @${entry.counterpartyUsername}`;
+      entry.type === "savings_contribution" ? `Aporte para ${entry.counterpartyName}` :
+        entry.type === "savings_withdrawal" ? `Resgate da meta ${entry.counterpartyName}` :
+          `${entry.amountCents < 0 ? "Para" : "De"} @${entry.counterpartyUsername}`;
     const sub = document.createElement("small");
     const date = new Date(`${entry.createdAt.replace(" ", "T")}Z`);
     sub.textContent = `${entry.type === "demo_credit" ? "Crédito de demonstração" : entry.counterpartyName} · ${date.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
@@ -605,6 +768,15 @@ function parseReais(input) {
   return amountCents;
 }
 
+function parseAmountInput(input) {
+  const amount = Number(String(input).replace(",", "."));
+  const cents = Math.round(amount * 100);
+  if (!Number.isFinite(amount) || !Number.isSafeInteger(cents) || amount <= 0 || amount > 1_000_000) {
+    throw new Error("Informe um valor válido em reais.");
+  }
+  return cents;
+}
+
 function formatAmountFromDigits(value) {
   const digits = value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").padStart(3, "0");
   const reais = digits.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -632,6 +804,11 @@ async function api(url, options = {}) {
   return body;
 }
 
+async function getCurrentUser() {
+  const result = await api("/api/auth/me");
+  return result.user;
+}
+
 (async () => {
   try { state.pendingEmail = sessionStorage.getItem("bank_pending_email"); } catch {}
   if (!localStorage.getItem("bank_token")) {
@@ -641,8 +818,7 @@ async function api(url, options = {}) {
   try {
     const result = await api("/api/auth/me");
     setUser(result.user);
-    await loadStatement();
-    await loadFavorites();
+    await Promise.all([loadStatement(), loadFavorites(), loadFinance()]);
   } catch {
     localStorage.removeItem("bank_token");
     $("#app-shell").classList.add("hidden");

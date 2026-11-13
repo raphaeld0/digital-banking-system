@@ -78,6 +78,7 @@
       <nav class="side-nav" aria-label="Navegação principal">
         <button type="button" class="nav-link active" data-view="home"><svg><use href="#i-grid"/></svg> Início</button>
         <button type="button" class="nav-link" data-view="transactions"><svg><use href="#i-arrows"/></svg> Transações</button>
+        <button type="button" class="nav-link" data-view="finance"><svg><use href="#i-wallet"/></svg> Planejamento</button>
         <button type="button" class="nav-link" data-view="settings"><svg><use href="#i-settings"/></svg> Configurações</button>
       </nav>
       <div class="sidebar-bottom">
@@ -150,6 +151,30 @@
         </div>
         <div id="statement-list" class="movement-list full-list"></div>
         <p id="statement-empty" class="empty-state">Nenhuma movimentação encontrada.</p>
+      </section>
+      <section id="finance-view" class="finance-view hidden">
+        <section class="panel finance-card">
+          <div class="panel-heading"><div><h2>Orçamento mensal</h2><p>O limite acompanha suas transferências de saída neste mês.</p></div></div>
+          <p id="budget-summary" class="budget-summary"></p>
+          <progress id="budget-progress" class="budget-progress" max="100" value="0"></progress>
+          <form id="budget-form" class="finance-form">
+            <label>Limite do mês (R$)<input name="limit" type="number" min="0.01" max="1000000" step="0.01" placeholder="Ex.: 2.500,00" required></label>
+            <button type="submit" class="primary">Salvar orçamento</button>
+            <button type="button" class="secondary" id="remove-budget">Remover limite</button>
+            <p id="budget-message" class="form-message" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+        <section class="panel finance-card">
+          <div class="panel-heading"><div><h2>Metas de economia</h2><p>Separe parte do saldo disponível e acompanhe seu progresso.</p></div></div>
+          <form id="goal-form" class="finance-form goal-create-form">
+            <label>Nome da meta<input name="name" maxlength="40" required placeholder="Ex.: Viagem"></label>
+            <label>Valor desejado (R$)<input name="target" type="number" min="0.01" max="1000000" step="0.01" required placeholder="Ex.: 5.000,00"></label>
+            <button type="submit" class="primary">Criar meta</button>
+            <p id="goal-message" class="form-message" role="status" aria-live="polite"></p>
+          </form>
+          <div id="goals-list" class="goals-list"></div>
+          <p id="goals-empty" class="empty-state">Você ainda não criou metas de economia.</p>
+        </section>
       </section>
       <section id="settings-view" class="settings-view hidden">
         <section class="panel settings-card">

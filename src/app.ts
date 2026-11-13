@@ -4,7 +4,7 @@ import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "http";
 import type { BankDatabase } from "./database.js";
 import { createSessionToken, hashPassword, hashToken, verifyPassword } from "./auth.js";
-import { ValidationError, validateCredentials, validateEmailChange, validateLegacyCredentials, validatePasswordChange, validateRegistration, validateResendRequest, validateTransfer, validateUsername, validateVerification } from "./validation.js";
+import { ValidationError, validateCredentials, validateEmailChange, validateGoalContribution, validateLegacyCredentials, validateMonthlyBudget, validatePasswordChange, validateRegistration, validateResendRequest, validateSavingsGoal, validateTransfer, validateUsername, validateVerification } from "./validation.js";
 import type { VerificationEmailSender } from "./resend.js";
 import { generateVerificationCode, hashVerificationCode, matchesVerificationCode } from "./verification.js";
 
@@ -281,6 +281,109 @@ export function createApp(options: AppOptions) {
         }
         return json(response, 200, { user: publicUser(findUserById(database, user.id)) });
       }
+      if (request.method === "GET" && url.pathname === "/api/finance/overview") {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        return json(response, 200, financeOverview(database, user.id));
+      }
+      if (request.method === "PUT" && url.pathname === "/api/monthly-budget") {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        const limitCents = validateMonthlyBudget(await readJson(request));
+        database.prepare(`
+          INSERT INTO monthly_budgets (user_id, limit_cents) VALUES (?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET limit_cents = excluded.limit_cents, updated_at = datetime('now')
+        `).run(user.id, limitCents);
+        return json(response, 200, financeOverview(database, user.id));
+      }
+      if (request.method === "DELETE" && url.pathname === "/api/monthly-budget") {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        database.prepare("DELETE FROM monthly_budgets WHERE user_id = ?").run(user.id);
+        return json(response, 200, financeOverview(database, user.id));
+      }
+      if (request.method === "POST" && url.pathname === "/api/savings-goals") {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        const input = validateSavingsGoal(await readJson(request));
+        try {
+          const result = database.prepare("INSERT INTO savings_goals (user_id, name, target_cents) VALUES (?, ?, ?)")
+            .run(user.id, input.name, input.targetCents);
+          const goal = database.prepare(`
+            SELECT id, name, target_cents AS targetCents, saved_cents AS savedCents
+            FROM savings_goals WHERE id = ?
+          `).get(Number(result.lastInsertRowid));
+          return json(response, 201, { goal });
+        } catch (error) {
+          if (String(error).includes("UNIQUE constraint failed")) {
+            return json(response, 409, { error: "Você já tem uma meta com esse nome." });
+          }
+          throw error;
+        }
+      }
+      const contributionMatch = url.pathname.match(/^\/api\/savings-goals\/(\d+)\/contributions$/);
+      if (request.method === "POST" && contributionMatch) {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        const goalId = Number(contributionMatch[1]);
+        const amountCents = validateGoalContribution(await readJson(request));
+        database.exec("BEGIN IMMEDIATE");
+        try {
+          const goal = database.prepare("SELECT * FROM savings_goals WHERE id = ? AND user_id = ?")
+            .get(goalId, user.id) as { id: number; name: string; target_cents: number; saved_cents: number } | undefined;
+          if (!goal) {
+            database.exec("ROLLBACK");
+            return json(response, 404, { error: "Meta não encontrada." });
+          }
+          if (goal.saved_cents + amountCents > goal.target_cents) {
+            database.exec("ROLLBACK");
+            return json(response, 409, { error: "Esse valor ultrapassaria o objetivo da meta." });
+          }
+          const debit = database.prepare("UPDATE users SET balance_cents = balance_cents - ? WHERE id = ? AND balance_cents >= ?")
+            .run(amountCents, user.id, amountCents);
+          if (debit.changes === 0) {
+            database.exec("ROLLBACK");
+            return json(response, 409, { error: "Saldo insuficiente para guardar esse valor." });
+          }
+          database.prepare("UPDATE savings_goals SET saved_cents = saved_cents + ? WHERE id = ?").run(amountCents, goalId);
+          database.prepare(`
+            INSERT INTO savings_goal_entries (user_id, goal_id, goal_name, amount_cents) VALUES (?, ?, ?, ?)
+          `).run(user.id, goalId, goal.name, -amountCents);
+          database.exec("COMMIT");
+        } catch (error) {
+          database.exec("ROLLBACK");
+          throw error;
+        }
+        return json(response, 200, financeOverview(database, user.id));
+      }
+      const goalMatch = url.pathname.match(/^\/api\/savings-goals\/(\d+)$/);
+      if (request.method === "DELETE" && goalMatch) {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        const goalId = Number(goalMatch[1]);
+        database.exec("BEGIN IMMEDIATE");
+        try {
+          const goal = database.prepare("SELECT * FROM savings_goals WHERE id = ? AND user_id = ?")
+            .get(goalId, user.id) as { id: number; name: string; saved_cents: number } | undefined;
+          if (!goal) {
+            database.exec("ROLLBACK");
+            return json(response, 404, { error: "Meta não encontrada." });
+          }
+          if (goal.saved_cents > 0) {
+            database.prepare("UPDATE users SET balance_cents = balance_cents + ? WHERE id = ?")
+              .run(goal.saved_cents, user.id);
+            database.prepare(`
+              INSERT INTO savings_goal_entries (user_id, goal_id, goal_name, amount_cents) VALUES (?, ?, ?, ?)
+            `).run(user.id, goal.id, goal.name, goal.saved_cents);
+          }
+          database.prepare("DELETE FROM savings_goals WHERE id = ? AND user_id = ?").run(goal.id, user.id);
+          database.exec("COMMIT");
+        } catch (error) {
+          database.exec("ROLLBACK");
+          throw error;
+        }
+        return json(response, 200, financeOverview(database, user.id));
+      }
       if (request.method === "GET" && url.pathname === "/api/favorites") {
         const user = authenticate(database, request);
         if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
@@ -336,6 +439,12 @@ export function createApp(options: AppOptions) {
             database.exec("ROLLBACK");
             return json(response, 400, { error: "Você não pode transferir para sua própria conta." });
           }
+          const budget = database.prepare("SELECT limit_cents FROM monthly_budgets WHERE user_id = ?")
+            .get(user.id) as { limit_cents: number } | undefined;
+          if (budget && monthlyTransferSpending(database, user.id) + input.amountCents > budget.limit_cents) {
+            database.exec("ROLLBACK");
+            return json(response, 409, { error: "Essa transferência ultrapassaria seu orçamento mensal." });
+          }
           const debit = database.prepare("UPDATE users SET balance_cents = balance_cents - ? WHERE id = ? AND balance_cents >= ?")
             .run(input.amountCents, user.id, input.amountCents);
           if (debit.changes === 0) {
@@ -371,8 +480,13 @@ export function createApp(options: AppOptions) {
           SELECT d.id, d.created_at AS createdAt, 'demo_credit' AS type,
             d.amount_cents AS amountCents, NULL AS counterpartyName, NULL AS counterpartyUsername
           FROM demo_credits d WHERE d.user_id = ?
+          UNION ALL
+          SELECT e.id, e.created_at AS createdAt,
+            CASE WHEN e.amount_cents < 0 THEN 'savings_contribution' ELSE 'savings_withdrawal' END AS type,
+            e.amount_cents AS amountCents, e.goal_name AS counterpartyName, NULL AS counterpartyUsername
+          FROM savings_goal_entries e WHERE e.user_id = ?
           ORDER BY createdAt DESC, id DESC LIMIT 50
-        `).all(user.id, user.id, user.id, user.id, user.id);
+        `).all(user.id, user.id, user.id, user.id, user.id, user.id);
         return json(response, 200, { entries });
       }
       if (request.method === "POST" && url.pathname === "/api/auth/logout") {
@@ -448,6 +562,37 @@ function bearerToken(request: IncomingMessage): string | undefined {
 
 function publicUser(user: UserRow) {
   return { id: user.id, name: user.name, email: user.email, username: user.username, balanceCents: user.balance_cents, createdAt: user.created_at };
+}
+
+function monthlyTransferSpending(database: BankDatabase, userId: number): number {
+  const { start, end } = currentMonthRange();
+  const row = database.prepare(`
+    SELECT COALESCE(SUM(amount_cents), 0) AS spentCents
+    FROM transfers WHERE sender_id = ? AND created_at >= ? AND created_at < ?
+  `).get(userId, start, end) as { spentCents: number };
+  return row.spentCents;
+}
+
+function financeOverview(database: BankDatabase, userId: number) {
+  const budget = database.prepare("SELECT limit_cents AS limitCents FROM monthly_budgets WHERE user_id = ?")
+    .get(userId) as { limitCents: number } | undefined;
+  const goals = database.prepare(`
+    SELECT id, name, target_cents AS targetCents, saved_cents AS savedCents
+    FROM savings_goals WHERE user_id = ? ORDER BY created_at DESC, id DESC
+  `).all(userId);
+  return {
+    monthlyBudgetCents: budget?.limitCents ?? null,
+    monthlySpentCents: monthlyTransferSpending(database, userId),
+    goals,
+  };
+}
+
+function currentMonthRange(): { start: string; end: string } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const sqlDate = (date: Date) => date.toISOString().slice(0, 19).replace("T", " ");
+  return { start: sqlDate(start), end: sqlDate(end) };
 }
 
 async function readJson(request: IncomingMessage): Promise<unknown> {

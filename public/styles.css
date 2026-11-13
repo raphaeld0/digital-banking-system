@@ -297,3 +297,29 @@ form input:focus,.search-box:focus-within,.handle-input:focus-within{border-colo
   #receipt-dialog .receipt-details>div{border-color:#ddd}
   #receipt-dialog .close-button,#receipt-dialog .receipt-actions{display:none}
 }
+.finance-view{display:grid;gap:18px;max-width:900px}
+.finance-card{padding:24px}
+.finance-card .panel-heading{margin-bottom:17px}
+.finance-form{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;align-items:end;gap:12px}
+.finance-form .form-message{grid-column:1/-1}
+.goal-create-form{grid-template-columns:minmax(160px,1fr) minmax(160px,.8fr) auto}
+.budget-summary{margin:0 0 10px;color:var(--text);font-size:13px;font-weight:700}
+.budget-progress,.goal-card progress{display:block;width:100%;height:9px;overflow:hidden;border:0;border-radius:99px;background:var(--panel-2);accent-color:var(--green)}
+.budget-progress::-webkit-progress-bar,.goal-card progress::-webkit-progress-bar{border-radius:99px;background:var(--panel-2)}
+.budget-progress::-webkit-progress-value,.goal-card progress::-webkit-progress-value{border-radius:99px;background:var(--green)}
+.budget-progress.over-budget{accent-color:var(--red)}
+.budget-progress.over-budget::-webkit-progress-value{background:var(--red)}
+.goals-list{display:grid;gap:11px;margin-top:16px}
+.goal-card{display:grid;gap:12px;padding:15px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2)}
+.goal-heading{display:flex;justify-content:space-between;gap:12px;font-size:12px}
+.goal-heading span{color:var(--muted);text-align:right}
+.goal-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.goal-contribution-form{display:flex;gap:8px;max-width:360px;flex:1}
+.goal-contribution-form input{height:36px;border:1px solid var(--border);border-radius:8px;background:#111823;color:var(--text);padding:0 10px}
+:root[data-theme="light"] .goal-contribution-form input{background:#f9fbfd;color:var(--text)}
+@media(max-width:600px){
+  .finance-form,.goal-create-form{grid-template-columns:1fr}
+  .finance-form .form-message{grid-column:auto}
+  .finance-form>button{justify-self:start}
+  .goal-actions{align-items:stretch}
+}

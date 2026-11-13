@@ -214,6 +214,61 @@ test("amizades favoritas são unilaterais e independem de transferência", async
   assert.equal(repeatedRemoval.response.status, 404);
 });
 
+test("metas de economia e orçamento mensal acompanham saldo e extrato", async () => {
+  const owner = await registerAndVerify({ name: "Duda Nunes", username: "dudanunes", email: "duda@example.com", password: "segura123" });
+  const recipient = await registerAndVerify({ name: "Caio Lima", username: "caiolima", email: "caio@example.com", password: "segura123" });
+  const token = owner.body.token;
+  await request("/api/account/demo-credit", { method: "POST" }, token);
+
+  const budget = await request("/api/monthly-budget", {
+    method: "PUT", body: JSON.stringify({ limitCents: 2500 }),
+  }, token);
+  assert.equal(budget.response.status, 200);
+  assert.equal(budget.body.monthlyBudgetCents, 2500);
+
+  const overBudget = await request("/api/transfers", {
+    method: "POST", body: JSON.stringify({ recipientUsername: "caiolima", amountCents: 3000 }),
+  }, token);
+  assert.equal(overBudget.response.status, 409);
+
+  const transfer = await request("/api/transfers", {
+    method: "POST", body: JSON.stringify({ recipientUsername: "caiolima", amountCents: 2000 }),
+  }, token);
+  assert.equal(transfer.response.status, 201);
+  const transferOverRemainingBudget = await request("/api/transfers", {
+    method: "POST", body: JSON.stringify({ recipientUsername: "caiolima", amountCents: 1000 }),
+  }, token);
+  assert.equal(transferOverRemainingBudget.response.status, 409);
+
+  const goal = await request("/api/savings-goals", {
+    method: "POST", body: JSON.stringify({ name: "Reserva", targetCents: 5000 }),
+  }, token);
+  assert.equal(goal.response.status, 201);
+  const duplicateGoal = await request("/api/savings-goals", {
+    method: "POST", body: JSON.stringify({ name: "reserva", targetCents: 5000 }),
+  }, token);
+  assert.equal(duplicateGoal.response.status, 409);
+
+  const contribution = await request(`/api/savings-goals/${goal.body.goal.id}/contributions`, {
+    method: "POST", body: JSON.stringify({ amountCents: 2000 }),
+  }, token);
+  assert.equal(contribution.response.status, 200);
+  assert.equal(contribution.body.goals[0].savedCents, 2000);
+  assert.equal(contribution.body.monthlySpentCents, 2000);
+
+  const statement = await request("/api/statement", {}, token);
+  assert.ok(statement.body.entries.some((entry: any) => entry.type === "savings_contribution" && entry.amountCents === -2000));
+
+  const deleted = await request(`/api/savings-goals/${goal.body.goal.id}`, { method: "DELETE" }, token);
+  assert.equal(deleted.response.status, 200);
+  const account = await request("/api/auth/me", {}, token);
+  assert.equal(account.body.user.balanceCents, 98000);
+
+  const removeBudget = await request("/api/monthly-budget", { method: "DELETE" }, token);
+  assert.equal(removeBudget.body.monthlyBudgetCents, null);
+  assert.equal(recipient.response.status, 201);
+});
+
 test("migração mantém contas antigas e permite escolher @usuário", async () => {
   const filename = path.join(temporaryDirectory, "legacy.db");
   const legacy = new DatabaseSync(filename);
@@ -427,6 +482,8 @@ test("interface e arquivos do painel são servidos", async () => {
   assert.match(html, /id="favorite-form"/);
   assert.match(html, /id="statement-type"/);
   assert.match(html, /id="receipt-dialog"/);
+  assert.match(html, /id="finance-view"/);
+  assert.match(html, /id="goal-form"/);
 
   const script = await fetch(`${origin}/app.js`);
   assert.equal(script.status, 200);

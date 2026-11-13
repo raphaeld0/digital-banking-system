@@ -38,6 +38,8 @@ Em **Amizades favoritas**, adicione qualquer conta existente pelo @usuário, rem
 
 Em **Transações**, pesquise por contato, usuário, valor, data ou identificador e filtre por tipo e período. O extrato mostra as 50 movimentações mais recentes; transferências concluídas têm comprovante que pode ser impresso.
 
+Em **Planejamento**, configure um limite mensal para transferências e crie metas de economia. Aportes são descontados do saldo disponível e aparecem no extrato; ao excluir uma meta, o valor guardado volta para o saldo. O orçamento acompanha transferências de saída e bloqueia uma nova transferência que ultrapassaria o limite.
+
 ## Endpoints
 
 - `POST /api/auth/register` — `{ "name", "username", "email", "password" }`; inicia o cadastro e envia o código
@@ -55,7 +57,13 @@ Em **Transações**, pesquise por contato, usuário, valor, data ou identificado
 - `POST /api/favorites` — `{ "username": "@raphaeldias" }`; adiciona um contato
 - `DELETE /api/favorites` — `{ "username": "@raphaeldias" }`; remove um contato
 - `POST /api/transfers` — `{ "recipientUsername": "@raphaeldias", "amountCents": 2500 }` envia R$ 25,00
-- `GET /api/statement` — últimas 50 movimentações da conta
+- `GET /api/statement` — últimas 50 movimentações da conta, incluindo aportes e resgates de metas
+- `GET /api/finance/overview` — orçamento mensal, gastos do mês e metas
+- `PUT /api/monthly-budget` — `{ "limitCents": 250000 }` define um limite de R$ 2.500,00
+- `DELETE /api/monthly-budget` — remove o limite mensal
+- `POST /api/savings-goals` — `{ "name": "Viagem", "targetCents": 500000 }` cria uma meta
+- `POST /api/savings-goals/:id/contributions` — `{ "amountCents": 10000 }` guarda R$ 100,00 na meta
+- `DELETE /api/savings-goals/:id` — exclui a meta e devolve o valor guardado ao saldo disponível
 - `GET /api/health` — estado da API
 
 Os valores são armazenados em centavos. Cada transferência debita, credita e registra a movimentação em uma transação única do SQLite. Senhas são derivadas com `scrypt`; tokens são aleatórios e somente seus hashes ficam no banco. Este projeto é uma simulação local. Para uso real, seriam necessários controles adicionais como HTTPS, autenticação reforçada e auditoria financeira.

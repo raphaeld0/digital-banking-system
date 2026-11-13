@@ -18,6 +18,11 @@ export interface TransferInput {
   amountCents: number;
 }
 
+export interface SavingsGoalInput {
+  name: string;
+  targetCents: number;
+}
+
 export interface EmailChange {
   email: string;
   currentPassword: string;
@@ -63,6 +68,24 @@ export function validateTransfer(value: unknown): TransferInput {
     throw new ValidationError("Informe um valor entre R$ 0,01 e R$ 100.000,00.");
   }
   return { recipientUsername, amountCents };
+}
+
+export function validateSavingsGoal(value: unknown): SavingsGoalInput {
+  const body = asObject(value);
+  const name = requiredString(body.name, "nome da meta").replace(/\s+/g, " ").trim();
+  const targetCents = validateCents(body.targetCents, "A meta deve ficar entre R$ 0,01 e R$ 1.000.000,00.", 100_000_000);
+  if (name.length < 2 || name.length > 40) throw new ValidationError("O nome da meta deve ter entre 2 e 40 caracteres.");
+  return { name, targetCents };
+}
+
+export function validateGoalContribution(value: unknown): number {
+  const body = asObject(value);
+  return validateCents(body.amountCents, "Informe um valor entre R$ 0,01 e R$ 100.000,00.", 10_000_000);
+}
+
+export function validateMonthlyBudget(value: unknown): number {
+  const body = asObject(value);
+  return validateCents(body.limitCents, "O orçamento deve ficar entre R$ 0,01 e R$ 1.000.000,00.", 100_000_000);
 }
 
 export function validateCredentials(value: unknown): Credentials {
@@ -145,4 +168,11 @@ function validatePassword(password: string): void {
   if (password.length < 8 || password.length > 128 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
     throw new ValidationError("A senha deve ter de 8 a 128 caracteres, com ao menos uma letra e um número.");
   }
+}
+
+function validateCents(value: unknown, message: string, maximum: number): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > maximum) {
+    throw new ValidationError(message);
+  }
+  return value;
 }
