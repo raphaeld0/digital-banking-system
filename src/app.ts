@@ -4,7 +4,7 @@ import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "http";
 import type { BankDatabase } from "./database.js";
 import { createSessionToken, hashPassword, hashToken, verifyPassword } from "./auth.js";
-import { ValidationError, validateCredentials, validateEmailChange, validateGoalContribution, validateLegacyCredentials, validateMonthlyBudget, validatePasswordChange, validateRegistration, validateResendRequest, validateSavingsGoal, validateTransfer, validateUsername, validateVerification } from "./validation.js";
+import { ValidationError, validateCredentials, validateEmailChange, validateGoalContribution, validateLegacyCredentials, validateMonthlyBudget, validatePasswordChange, validateRegistration, validateResendRequest, validateSavingsGoal, validateScheduledTransfer, validateTransfer, validateUsername, validateVerification } from "./validation.js";
 import type { VerificationEmailSender } from "./resend.js";
 import { generateVerificationCode, hashVerificationCode, matchesVerificationCode } from "./verification.js";
 
@@ -466,6 +466,57 @@ export function createApp(options: AppOptions) {
           throw error;
         }
       }
+      if (request.method === "GET" && url.pathname === "/api/scheduled-transfers") {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        const transfers = database.prepare(`
+          SELECT s.id, s.amount_cents AS amountCents, s.frequency, s.next_run_at AS nextRunAt,
+            s.status, s.last_error AS lastError, u.name AS recipientName, u.username AS recipientUsername
+          FROM scheduled_transfers s JOIN users u ON u.id = s.recipient_id
+          WHERE s.sender_id = ? ORDER BY s.next_run_at, s.id
+        `).all(user.id);
+        return json(response, 200, { transfers });
+      }
+      if (request.method === "POST" && url.pathname === "/api/scheduled-transfers") {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        if (!user.username) return json(response, 409, { error: "Escolha seu @usuário antes de agendar transferências." });
+        const input = validateScheduledTransfer(await readJson(request));
+        const recipient = database.prepare("SELECT id, username FROM users WHERE username = ? COLLATE NOCASE")
+          .get(input.recipientUsername) as { id: number; username: string } | undefined;
+        if (!recipient) return json(response, 404, { error: "@usuário de destino não encontrado." });
+        if (recipient.id === user.id) return json(response, 400, { error: "Você não pode agendar uma transferência para sua própria conta." });
+        const scheduledDate = new Date(input.scheduledAt);
+        const nextRunAt = sqlDate(scheduledDate);
+        const result = database.prepare(`
+          INSERT INTO scheduled_transfers
+            (sender_id, recipient_id, amount_cents, frequency, monthly_day, next_run_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(user.id, recipient.id, input.amountCents, input.frequency,
+          input.frequency === "monthly" ? scheduledDate.getUTCDate() : null, nextRunAt);
+        return json(response, 201, {
+          transfer: {
+            id: Number(result.lastInsertRowid),
+            to: `@${recipient.username}`,
+            amountCents: input.amountCents,
+            frequency: input.frequency,
+            nextRunAt,
+            status: "active",
+          },
+        });
+      }
+      const scheduledTransferMatch = url.pathname.match(/^\/api\/scheduled-transfers\/(\d+)$/);
+      if (request.method === "DELETE" && scheduledTransferMatch) {
+        const user = authenticate(database, request);
+        if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
+        const cancelled = database.prepare(`
+          UPDATE scheduled_transfers SET status = 'cancelled', last_error = NULL
+          WHERE id = ? AND sender_id = ? AND status IN ('active', 'failed')
+        `).run(Number(scheduledTransferMatch[1]), user.id);
+        if (cancelled.changes === 0) return json(response, 404, { error: "Agendamento ativo não encontrado." });
+        response.writeHead(204).end();
+        return;
+      }
       if (request.method === "GET" && url.pathname === "/api/statement") {
         const user = authenticate(database, request);
         if (!user) return json(response, 401, { error: "Sessão inválida ou expirada." });
@@ -591,8 +642,95 @@ function currentMonthRange(): { start: string; end: string } {
   const now = new Date();
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  const sqlDate = (date: Date) => date.toISOString().slice(0, 19).replace("T", " ");
   return { start: sqlDate(start), end: sqlDate(end) };
+}
+
+export function processDueScheduledTransfers(database: BankDatabase, now = new Date()): void {
+  const dueIds = database.prepare(`
+    SELECT id FROM scheduled_transfers
+    WHERE status = 'active' AND next_run_at <= ?
+    ORDER BY next_run_at, id LIMIT 100
+  `).all(sqlDate(now)) as Array<{ id: number }>;
+
+  for (const { id } of dueIds) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      const schedule = database.prepare(`
+        SELECT * FROM scheduled_transfers
+        WHERE id = ? AND status = 'active' AND next_run_at <= ?
+      `).get(id, sqlDate(now)) as {
+        id: number;
+        sender_id: number;
+        recipient_id: number;
+        amount_cents: number;
+        frequency: "once" | "weekly" | "monthly";
+        monthly_day: number | null;
+        next_run_at: string;
+      } | undefined;
+      if (!schedule) {
+        database.exec("COMMIT");
+        continue;
+      }
+
+      const budget = database.prepare("SELECT limit_cents FROM monthly_budgets WHERE user_id = ?")
+        .get(schedule.sender_id) as { limit_cents: number } | undefined;
+      if (budget && monthlyTransferSpending(database, schedule.sender_id) + schedule.amount_cents > budget.limit_cents) {
+        database.prepare("UPDATE scheduled_transfers SET status = 'failed', last_error = ? WHERE id = ?")
+          .run("A transferência ultrapassaria o orçamento mensal.", id);
+        database.exec("COMMIT");
+        continue;
+      }
+
+      const debit = database.prepare(`
+        UPDATE users SET balance_cents = balance_cents - ?
+        WHERE id = ? AND balance_cents >= ?
+      `).run(schedule.amount_cents, schedule.sender_id, schedule.amount_cents);
+      if (debit.changes === 0) {
+        database.prepare("UPDATE scheduled_transfers SET status = 'failed', last_error = ? WHERE id = ?")
+          .run("Saldo insuficiente.", id);
+        database.exec("COMMIT");
+        continue;
+      }
+
+      database.prepare("UPDATE users SET balance_cents = balance_cents + ? WHERE id = ?")
+        .run(schedule.amount_cents, schedule.recipient_id);
+      database.prepare("INSERT INTO transfers (sender_id, recipient_id, amount_cents) VALUES (?, ?, ?)")
+        .run(schedule.sender_id, schedule.recipient_id, schedule.amount_cents);
+
+      if (schedule.frequency === "once") {
+        database.prepare("UPDATE scheduled_transfers SET status = 'completed', last_error = NULL WHERE id = ?").run(id);
+      } else {
+        let nextRun = new Date(`${schedule.next_run_at.replace(" ", "T")}Z`);
+        do {
+          nextRun = nextScheduledDate(nextRun, schedule.frequency, schedule.monthly_day);
+        } while (nextRun <= now);
+        database.prepare("UPDATE scheduled_transfers SET next_run_at = ?, last_error = NULL WHERE id = ?")
+          .run(sqlDate(nextRun), id);
+      }
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+}
+
+function nextScheduledDate(current: Date, frequency: "weekly" | "monthly", monthlyDay: number | null): Date {
+  const next = new Date(current);
+  if (frequency === "weekly") {
+    next.setUTCDate(next.getUTCDate() + 7);
+    return next;
+  }
+  const day = monthlyDay ?? current.getUTCDate();
+  next.setUTCDate(1);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+  next.setUTCDate(Math.min(day, lastDay));
+  return next;
+}
+
+function sqlDate(date: Date): string {
+  return date.toISOString().slice(0, 19).replace("T", " ");
 }
 
 async function readJson(request: IncomingMessage): Promise<unknown> {

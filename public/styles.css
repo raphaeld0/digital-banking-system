@@ -323,3 +323,23 @@ form input:focus,.search-box:focus-within,.handle-input:focus-within{border-colo
   .finance-form>button{justify-self:start}
   .goal-actions{align-items:stretch}
 }
+.scheduled-view{max-width:900px}
+.schedule-form{grid-template-columns:repeat(2,minmax(0,1fr));margin:18px 0}
+.schedule-form select{height:43px;border:1px solid var(--border);border-radius:8px;background:#111823;color:var(--text);padding:0 12px}
+:root[data-theme="light"] .schedule-form select{background:#f9fbfd;color:var(--text)}
+.schedule-form .handle-input input{width:100%}
+.scheduled-list{display:grid;gap:10px}
+.scheduled-item{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px;border:1px solid var(--border);border-radius:11px;background:var(--panel-2)}
+.scheduled-item>div:first-child{display:grid;gap:4px;min-width:0}
+.scheduled-item strong{font-size:12px}
+.scheduled-item small{color:var(--muted);font-size:11px}
+.scheduled-actions{display:flex;align-items:center;gap:14px}
+.schedule-status{font-size:11px;font-weight:800}
+.schedule-status.active{color:var(--green)}
+.schedule-status.failed{color:var(--red)}
+.schedule-status.completed{color:var(--cyan)}
+.schedule-status.cancelled{color:var(--muted)}
+@media(max-width:600px){
+  .schedule-form{grid-template-columns:1fr}
+  .scheduled-item{align-items:flex-start;flex-direction:column}
+}

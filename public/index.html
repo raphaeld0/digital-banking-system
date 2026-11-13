@@ -79,6 +79,7 @@
         <button type="button" class="nav-link active" data-view="home"><svg><use href="#i-grid"/></svg> Início</button>
         <button type="button" class="nav-link" data-view="transactions"><svg><use href="#i-arrows"/></svg> Transações</button>
         <button type="button" class="nav-link" data-view="finance"><svg><use href="#i-wallet"/></svg> Planejamento</button>
+        <button type="button" class="nav-link" data-view="scheduled"><svg><use href="#i-arrows"/></svg> Agendamentos</button>
         <button type="button" class="nav-link" data-view="settings"><svg><use href="#i-settings"/></svg> Configurações</button>
       </nav>
       <div class="sidebar-bottom">
@@ -175,6 +176,19 @@
           <div id="goals-list" class="goals-list"></div>
           <p id="goals-empty" class="empty-state">Você ainda não criou metas de economia.</p>
         </section>
+      </section>
+      <section id="scheduled-view" class="panel scheduled-view hidden">
+        <div class="panel-heading"><div><h2>Transferências agendadas</h2><p>Agende pagamentos únicos, semanais ou mensais.</p></div></div>
+        <form id="schedule-form" class="finance-form schedule-form">
+          <label>Destinatário<span class="handle-input"><span aria-hidden="true">@</span><input name="recipientUsername" required autocomplete="off" placeholder="usuario"></span></label>
+          <label>Valor (R$)<input name="amount" type="number" min="0.01" max="100000" step="0.01" required placeholder="Ex.: 25,00"></label>
+          <label>Primeira data e hora<input name="scheduledAt" type="datetime-local" required></label>
+          <label>Repetição<select name="frequency"><option value="once">Uma vez</option><option value="weekly">Toda semana</option><option value="monthly">Todo mês</option></select></label>
+          <button type="submit" class="primary">Agendar transferência</button>
+          <p id="schedule-message" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+        <div id="scheduled-list" class="scheduled-list"></div>
+        <p id="scheduled-empty" class="empty-state">Nenhuma transferência agendada.</p>
       </section>
       <section id="settings-view" class="settings-view hidden">
         <section class="panel settings-card">

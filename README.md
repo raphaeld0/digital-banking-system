@@ -40,6 +40,8 @@ Em **Transações**, pesquise por contato, usuário, valor, data ou identificado
 
 Em **Planejamento**, configure um limite mensal para transferências e crie metas de economia. Aportes são descontados do saldo disponível e aparecem no extrato; ao excluir uma meta, o valor guardado volta para o saldo. O orçamento acompanha transferências de saída e bloqueia uma nova transferência que ultrapassaria o limite.
 
+Em **Agendamentos**, crie transferências para uma data futura, uma vez, semanalmente ou mensalmente. O servidor verifica tarefas vencidas a cada 30 segundos enquanto está ativo; saldo insuficiente ou limite mensal excedido marca o agendamento como falho, sem debitar a conta. Recorrências mantêm a data mensal escolhida (ajustada ao último dia em meses mais curtos) e pulam execuções passadas se o servidor ficou desligado.
+
 ## Endpoints
 
 - `POST /api/auth/register` — `{ "name", "username", "email", "password" }`; inicia o cadastro e envia o código
@@ -64,6 +66,9 @@ Em **Planejamento**, configure um limite mensal para transferências e crie meta
 - `POST /api/savings-goals` — `{ "name": "Viagem", "targetCents": 500000 }` cria uma meta
 - `POST /api/savings-goals/:id/contributions` — `{ "amountCents": 10000 }` guarda R$ 100,00 na meta
 - `DELETE /api/savings-goals/:id` — exclui a meta e devolve o valor guardado ao saldo disponível
+- `GET /api/scheduled-transfers` — lista seus agendamentos
+- `POST /api/scheduled-transfers` — cria um agendamento com `{ "recipientUsername", "amountCents", "scheduledAt", "frequency" }`; frequência: `once`, `weekly` ou `monthly`
+- `DELETE /api/scheduled-transfers/:id` — cancela um agendamento ativo ou falho
 - `GET /api/health` — estado da API
 
 Os valores são armazenados em centavos. Cada transferência debita, credita e registra a movimentação em uma transação única do SQLite. Senhas são derivadas com `scrypt`; tokens são aleatórios e somente seus hashes ficam no banco. Este projeto é uma simulação local. Para uso real, seriam necessários controles adicionais como HTTPS, autenticação reforçada e auditoria financeira.

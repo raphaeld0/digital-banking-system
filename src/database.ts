@@ -110,5 +110,21 @@ function migrate(database: BankDatabase): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_savings_goal_entries_user ON savings_goal_entries(user_id, id DESC);
+
+    CREATE TABLE IF NOT EXISTS scheduled_transfers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recipient_id INTEGER NOT NULL REFERENCES users(id),
+      amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+      frequency TEXT NOT NULL CHECK (frequency IN ('once', 'weekly', 'monthly')),
+      monthly_day INTEGER CHECK (monthly_day BETWEEN 1 AND 31),
+      next_run_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled', 'failed')),
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      CHECK (sender_id <> recipient_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_scheduled_transfers_due ON scheduled_transfers(status, next_run_at);
+    CREATE INDEX IF NOT EXISTS idx_scheduled_transfers_sender ON scheduled_transfers(sender_id, created_at DESC);
   `);
 }

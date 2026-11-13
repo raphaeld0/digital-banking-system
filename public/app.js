@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const money = (cents) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
-const state = { user: null, entries: [], favorites: [], finance: { monthlyBudgetCents: null, monthlySpentCents: 0, goals: [] }, view: "home", balanceVisible: true, authMode: "login", pendingEmail: null };
+const state = { user: null, entries: [], favorites: [], finance: { monthlyBudgetCents: null, monthlySpentCents: 0, goals: [] }, scheduledTransfers: [], view: "home", balanceVisible: true, authMode: "login", pendingEmail: null };
 let toastTimer;
 let resendTimer;
 
@@ -239,6 +239,7 @@ $("#transfer-form").addEventListener("submit", async (event) => {
     });
     setUser(result.user);
     await loadStatement();
+    await loadScheduledTransfers();
     await loadFinance();
     closeTransfer();
     event.currentTarget.reset();
@@ -381,6 +382,38 @@ $("#goal-form").addEventListener("submit", async (event) => {
       method: "POST",
       body: JSON.stringify({ name: fields.name, targetCents: parseAmountInput(fields.target) }),
     });
+
+    $("#schedule-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button[type="submit"]');
+      const message = $("#schedule-message");
+      message.textContent = "";
+      message.classList.remove("success");
+      button.disabled = true;
+      try {
+        const fields = Object.fromEntries(new FormData(form));
+        const scheduledAt = new Date(fields.scheduledAt);
+        if (!Number.isFinite(scheduledAt.getTime())) throw new Error("Informe uma data válida.");
+        await api("/api/scheduled-transfers", {
+          method: "POST",
+          body: JSON.stringify({
+            recipientUsername: fields.recipientUsername,
+            amountCents: parseAmountInput(fields.amount),
+            scheduledAt: scheduledAt.toISOString(),
+            frequency: fields.frequency,
+          }),
+        });
+        form.reset();
+        await loadScheduledTransfers();
+        message.textContent = "Transferência agendada. O processamento ocorre enquanto o servidor estiver ativo.";
+        message.classList.add("success");
+      } catch (error) {
+        message.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
     form.reset();
     await loadFinance();
     message.textContent = "Meta criada.";
@@ -475,10 +508,11 @@ function showView(view) {
   $("#home-view").classList.toggle("hidden", view !== "home");
   $("#transactions-view").classList.toggle("hidden", view !== "transactions");
   $("#finance-view").classList.toggle("hidden", view !== "finance");
+  $("#scheduled-view").classList.toggle("hidden", view !== "scheduled");
   $("#settings-view").classList.toggle("hidden", view !== "settings");
   $("#search-box").classList.toggle("hidden", view === "settings");
-  $("#welcome").textContent = view === "settings" ? "Configurações" : view === "transactions" ? "Transações" : view === "finance" ? "Planejamento" : `Olá, ${state.user.name.split(" ")[0]}`;
-  $("#topbar-subtitle").textContent = view === "settings" ? "Gerencie seus dados de acesso e a aparência do site." : view === "transactions" ? "Confira as movimentações da sua conta." : view === "finance" ? "Organize seus limites e acompanhe suas metas." : "Bem-vindo de volta! Aqui está o resumo das suas finanças.";
+  $("#welcome").textContent = view === "settings" ? "Configurações" : view === "transactions" ? "Transações" : view === "finance" ? "Planejamento" : view === "scheduled" ? "Agendamentos" : `Olá, ${state.user.name.split(" ")[0]}`;
+  $("#topbar-subtitle").textContent = view === "settings" ? "Gerencie seus dados de acesso e a aparência do site." : view === "transactions" ? "Confira as movimentações da sua conta." : view === "finance" ? "Organize seus limites e acompanhe suas metas." : view === "scheduled" ? "Planeje transferências únicas ou recorrentes." : "Bem-vindo de volta! Aqui está o resumo das suas finanças.";
   document.querySelectorAll(".nav-link").forEach((link) => link.classList.toggle("active", link.dataset.view === view));
 }
 
@@ -538,6 +572,56 @@ async function loadFavorites() {
 async function loadFinance() {
   state.finance = await api("/api/finance/overview");
   renderFinance();
+}
+
+async function loadScheduledTransfers() {
+  const result = await api("/api/scheduled-transfers");
+  state.scheduledTransfers = result.transfers;
+  renderScheduledTransfers();
+}
+
+function renderScheduledTransfers() {
+  const container = $("#scheduled-list");
+  container.replaceChildren();
+  $("#scheduled-empty").classList.toggle("hidden", state.scheduledTransfers.length > 0);
+  const frequencyNames = { once: "Uma vez", weekly: "Semanal", monthly: "Mensal" };
+  for (const transfer of state.scheduledTransfers) {
+    const card = document.createElement("article");
+    card.className = "scheduled-item";
+    const details = document.createElement("div");
+    const heading = document.createElement("strong");
+    heading.textContent = `${money(transfer.amountCents)} para @${transfer.recipientUsername}`;
+    const subtitle = document.createElement("small");
+    const date = new Date(`${transfer.nextRunAt.replace(" ", "T")}Z`);
+    subtitle.textContent = `${frequencyNames[transfer.frequency]} · ${transfer.status === "active" ? "Próxima: " + date.toLocaleString("pt-BR") : transfer.status === "completed" ? "Concluída" : transfer.status === "failed" ? `Falhou: ${transfer.lastError}` : "Cancelada"}`;
+    details.append(heading, subtitle);
+    const actions = document.createElement("div");
+    actions.className = "scheduled-actions";
+    const status = document.createElement("span");
+    status.className = `schedule-status ${transfer.status}`;
+    status.textContent = transfer.status === "active" ? "Ativa" : transfer.status === "completed" ? "Concluída" : transfer.status === "failed" ? "Falhou" : "Cancelada";
+    actions.append(status);
+    if (transfer.status === "active" || transfer.status === "failed") {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "text-button";
+      cancel.textContent = "Cancelar";
+      cancel.addEventListener("click", async () => {
+        cancel.disabled = true;
+        try {
+          await api(`/api/scheduled-transfers/${transfer.id}`, { method: "DELETE" });
+          await loadScheduledTransfers();
+          notify("Agendamento cancelado.");
+        } catch (error) {
+          notify(error.message, true);
+          cancel.disabled = false;
+        }
+      });
+      actions.append(cancel);
+    }
+    card.append(details, actions);
+    container.append(card);
+  }
 }
 
 function renderFinance() {
@@ -818,7 +902,7 @@ async function getCurrentUser() {
   try {
     const result = await api("/api/auth/me");
     setUser(result.user);
-    await Promise.all([loadStatement(), loadFavorites(), loadFinance()]);
+    await Promise.all([loadStatement(), loadFavorites(), loadFinance(), loadScheduledTransfers()]);
   } catch {
     localStorage.removeItem("bank_token");
     $("#app-shell").classList.add("hidden");

@@ -23,6 +23,11 @@ export interface SavingsGoalInput {
   targetCents: number;
 }
 
+export interface ScheduledTransferInput extends TransferInput {
+  scheduledAt: string;
+  frequency: "once" | "weekly" | "monthly";
+}
+
 export interface EmailChange {
   email: string;
   currentPassword: string;
@@ -68,6 +73,25 @@ export function validateTransfer(value: unknown): TransferInput {
     throw new ValidationError("Informe um valor entre R$ 0,01 e R$ 100.000,00.");
   }
   return { recipientUsername, amountCents };
+}
+
+export function validateScheduledTransfer(value: unknown): ScheduledTransferInput {
+  const body = asObject(value);
+  const { recipientUsername, amountCents } = validateTransfer(body);
+  const scheduledAt = requiredString(body.scheduledAt, "data e hora").trim();
+  const frequency = body.frequency;
+  if (frequency !== "once" && frequency !== "weekly" && frequency !== "monthly") {
+    throw new ValidationError("Escolha uma frequência válida.");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(scheduledAt)) {
+    throw new ValidationError("Informe uma data e hora válidas.");
+  }
+  const timestamp = Date.parse(scheduledAt);
+  const now = Date.now();
+  if (!Number.isFinite(timestamp) || timestamp <= now || timestamp > now + 5 * 366 * 24 * 60 * 60 * 1000) {
+    throw new ValidationError("Agende para um horário futuro, em até cinco anos.");
+  }
+  return { recipientUsername, amountCents, scheduledAt, frequency };
 }
 
 export function validateSavingsGoal(value: unknown): SavingsGoalInput {

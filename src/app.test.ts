@@ -5,7 +5,7 @@ import path from "node:path";
 import http from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { after, before, test } from "node:test";
-import { createApp } from "./app.js";
+import { createApp, processDueScheduledTransfers } from "./app.js";
 import { openDatabase, type BankDatabase } from "./database.js";
 
 let origin: string;
@@ -269,6 +269,45 @@ test("metas de economia e orçamento mensal acompanham saldo e extrato", async (
   assert.equal(recipient.response.status, 201);
 });
 
+test("agendamentos únicos e recorrentes processam saldo e podem ser cancelados", async () => {
+  const sender = await registerAndVerify({ name: "Nina Melo", username: "ninamelo", email: "nina@example.com", password: "segura123" });
+  const recipient = await registerAndVerify({ name: "Ivo Reis", username: "ivoreis", email: "ivo@example.com", password: "segura123" });
+  const token = sender.body.token;
+  await request("/api/account/demo-credit", { method: "POST" }, token);
+
+  const schedule = async (frequency: string, username = "ivoreis") => request("/api/scheduled-transfers", {
+    method: "POST",
+    body: JSON.stringify({
+      recipientUsername: username,
+      amountCents: 1500,
+      scheduledAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      frequency,
+    }),
+  }, token);
+
+  const once = await schedule("once");
+  assert.equal(once.response.status, 201);
+  assert.equal(once.body.transfer.status, "active");
+  database.prepare("UPDATE scheduled_transfers SET next_run_at = datetime('now', '-1 second') WHERE id = ?")
+    .run(once.body.transfer.id);
+  processDueScheduledTransfers(database);
+  const afterOnce = await request("/api/scheduled-transfers", {}, token);
+  assert.equal(afterOnce.body.transfers.find((transfer: any) => transfer.id === once.body.transfer.id).status, "completed");
+  const senderAccount = await request("/api/auth/me", {}, token);
+  const recipientAccount = await request("/api/auth/me", {}, recipient.body.token);
+  assert.equal(senderAccount.body.user.balanceCents, 98500);
+  assert.equal(recipientAccount.body.user.balanceCents, 1500);
+
+  const weekly = await schedule("weekly");
+  assert.equal(weekly.response.status, 201);
+  const active = await request("/api/scheduled-transfers", {}, token);
+  assert.equal(active.body.transfers.find((transfer: any) => transfer.id === weekly.body.transfer.id).frequency, "weekly");
+  const cancelled = await request(`/api/scheduled-transfers/${weekly.body.transfer.id}`, { method: "DELETE" }, token);
+  assert.equal(cancelled.response.status, 204);
+  const noLongerActive = await request("/api/scheduled-transfers", {}, token);
+  assert.equal(noLongerActive.body.transfers.find((transfer: any) => transfer.id === weekly.body.transfer.id).status, "cancelled");
+});
+
 test("migração mantém contas antigas e permite escolher @usuário", async () => {
   const filename = path.join(temporaryDirectory, "legacy.db");
   const legacy = new DatabaseSync(filename);
@@ -484,6 +523,7 @@ test("interface e arquivos do painel são servidos", async () => {
   assert.match(html, /id="receipt-dialog"/);
   assert.match(html, /id="finance-view"/);
   assert.match(html, /id="goal-form"/);
+  assert.match(html, /id="schedule-form"/);
 
   const script = await fetch(`${origin}/app.js`);
   assert.equal(script.status, 200);
